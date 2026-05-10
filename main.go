@@ -2,11 +2,25 @@ package main
 
 import (
 	"context"
+	"log"
 	"sync"
 	"time"
+
+	"github.com/gdamore/tcell/v2"
 )
 
 func main() {
+	// 1. Inicialização do tcell
+	screen, err := tcell.NewScreen()
+	if err != nil {
+		log.Fatalf("Erro ao criar tela: %v", err)
+	}
+	if err := screen.Init(); err != nil {
+		log.Fatalf("Erro ao inicializar tela: %v", err)
+	}
+	// Isso garante que o terminal volte ao normal (sem bugar) quando o jogo fechar
+	defer screen.Fini()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -22,12 +36,15 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(6)
 
+	// 2. Passamos o "screen" para quem precisa (Renderer e InputReader)
 	go RunGameCoordinator(ctx, &wg, state, inputCh, enemyActionCh, tickCh, renderCh, cancel, enemyAStateCh, enemyBStateCh)
-	go RunRenderer(ctx, &wg, renderCh)
-	go RunInputReader(ctx, &wg, inputCh)
+	go RunRenderer(ctx, &wg, renderCh, screen)
+	go RunInputReader(ctx, &wg, inputCh, screen)
 	go RunTicker(ctx, &wg, tickCh)
-	go RunEnemy(ctx, &wg, "enemy-a", "chase", enemyAStateCh, enemyActionCh, 800*time.Millisecond)
-	go RunEnemy(ctx, &wg, "enemy-b", "patrol", enemyBStateCh, enemyActionCh, 1200*time.Millisecond)
+
+	// Como a movimentação agora é instantânea com o tcell, podemos deixar os inimigos rápidos de novo!
+	go RunEnemy(ctx, &wg, "enemy-a", "chase", 800*time.Millisecond, enemyAStateCh, enemyActionCh)
+	go RunEnemy(ctx, &wg, "enemy-b", "patrol", 1200*time.Millisecond, enemyBStateCh, enemyActionCh)
 
 	<-ctx.Done()
 	wg.Wait()

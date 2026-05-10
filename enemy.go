@@ -10,17 +10,17 @@ func RunEnemy(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	enemyID, behavior string,
+	speed time.Duration, //velocidade individual dos inimigos
 	stateCh <-chan GameSnapshot,
 	actionCh chan<- EnemyAction,
-	interval time.Duration,
 ) {
 	defer wg.Done()
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
 
 	var snap GameSnapshot
 	hasSnap := false
 	patrolDir := 1
+	ticker := time.NewTicker(speed)
+	defer ticker.Stop()
 
 	for {
 		select {

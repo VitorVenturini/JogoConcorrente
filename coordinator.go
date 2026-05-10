@@ -13,10 +13,10 @@ func RunGameCoordinator(
 	inputCh <-chan PlayerCommand,
 	enemyActionCh <-chan EnemyAction,
 	tickCh <-chan Tick,
-	renderCh chan<- GameSnapshot,
+	renderCh chan GameSnapshot,
 	cancel context.CancelFunc,
-	enemyAStateCh chan<- GameSnapshot,
-	enemyBStateCh chan<- GameSnapshot,
+	enemyAStateCh chan GameSnapshot,
+	enemyBStateCh chan GameSnapshot,
 ) {
 	defer wg.Done()
 
@@ -32,10 +32,7 @@ func RunGameCoordinator(
 			return
 		case cmd := <-inputCh:
 			handlePlayerCommand(&state, cmd, cancel)
-			snap = state.Snapshot()
-			sendSnapshot(renderCh, snap)
-			sendSnapshot(enemyAStateCh, snap)
-			sendSnapshot(enemyBStateCh, snap)
+			updateAllSnapshots(&state, renderCh, enemyAStateCh, enemyBStateCh)
 			if state.GameOver || state.Victory || state.ShouldQuit {
 				cancel()
 				return
@@ -52,15 +49,18 @@ func RunGameCoordinator(
 			}
 		case tick := <-tickCh:
 			handleTick(&state, tick)
-			snap = state.Snapshot()
-			sendSnapshot(renderCh, snap)
-			sendSnapshot(enemyAStateCh, snap)
-			sendSnapshot(enemyBStateCh, snap)
 		}
 	}
 }
 
-func sendSnapshot(ch chan<- GameSnapshot, snapshot GameSnapshot) {
+func updateAllSnapshots(state *GameState, r, eA, eB chan GameSnapshot) {
+	snap := state.Snapshot()
+	sendSnapshot(r, snap)
+	sendSnapshot(eA, snap)
+	sendSnapshot(eB, snap)
+}
+
+func sendSnapshot(ch chan GameSnapshot, snapshot GameSnapshot) {
 	select {
 	case ch <- snapshot:
 	default:

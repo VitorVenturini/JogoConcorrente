@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
+
+	"github.com/gdamore/tcell/v2"
 )
 
-func RunRenderer(ctx context.Context, wg *sync.WaitGroup, renderCh <-chan GameSnapshot) {
+func RunRenderer(ctx context.Context, wg *sync.WaitGroup, renderCh <-chan GameSnapshot, screen tcell.Screen) {
 	defer wg.Done()
 
 	for {
@@ -15,54 +16,62 @@ func RunRenderer(ctx context.Context, wg *sync.WaitGroup, renderCh <-chan GameSn
 		case <-ctx.Done():
 			return
 		case snapshot := <-renderCh:
-			drawSnapshot(snapshot)
+			drawSnapshot(snapshot, screen)
 		}
 	}
 }
 
-func drawSnapshot(snapshot GameSnapshot) {
-	fmt.Print("\033[H\033[2J")
-	fmt.Println("Arena Concorrente")
-	fmt.Println(renderArena(snapshot))
-	fmt.Printf("HP: %d  Tick: %d\n", snapshot.HUD.PlayerLife, snapshot.HUD.Tick)
-	fmt.Printf("Mensagem: %s\n", snapshot.HUD.Message)
-	fmt.Println("Comandos: up, down, left, right, attack, quit")
-}
+func drawSnapshot(snapshot GameSnapshot, screen tcell.Screen) {
+	screen.Clear() // Limpa o buffer do tcell
 
-func renderArena(snapshot GameSnapshot) string {
-	grid := make([][]rune, snapshot.Arena.Height)
+	// Estilos visuais opcionais
+	defStyle := tcell.StyleDefault.Foreground(tcell.ColorWhite)
+	playerStyle := tcell.StyleDefault.Foreground(tcell.ColorGreen).Bold(true)
+	enemyStyle := tcell.StyleDefault.Foreground(tcell.ColorRed).Bold(true)
+	borderStyle := tcell.StyleDefault.Foreground(tcell.ColorGray)
+
+	offsetX := 2
+	offsetY := 2
+
+	// Desenhar o cenário
 	for y := 0; y < snapshot.Arena.Height; y++ {
-		grid[y] = make([]rune, snapshot.Arena.Width)
 		for x := 0; x < snapshot.Arena.Width; x++ {
-			grid[y][x] = '.'
+			screen.SetContent(offsetX+x, offsetY+y, '.', nil, defStyle)
 		}
 	}
 
-	playerPos := snapshot.Player.Position
-	if isInsideArena(snapshot.Arena, playerPos) {
-		grid[playerPos.Y][playerPos.X] = snapshot.Player.Symbol
+	// Desenhar bordas
+	for x := 0; x < snapshot.Arena.Width; x++ {
+		screen.SetContent(offsetX+x, offsetY-1, '-', nil, borderStyle)
+		screen.SetContent(offsetX+x, offsetY+snapshot.Arena.Height, '-', nil, borderStyle)
+	}
+	for y := 0; y < snapshot.Arena.Height; y++ {
+		screen.SetContent(offsetX-1, offsetY+y, '|', nil, borderStyle)
+		screen.SetContent(offsetX+snapshot.Arena.Width, offsetY+y, '|', nil, borderStyle)
 	}
 
+	// Desenhar o jogador
+	pPos := snapshot.Player.Position
+	screen.SetContent(offsetX+pPos.X, offsetY+pPos.Y, snapshot.Player.Symbol, nil, playerStyle)
+
+	// Desenhar os inimigos
 	for _, enemy := range snapshot.Enemies {
-		if isInsideArena(snapshot.Arena, enemy.Position) {
-			grid[enemy.Position.Y][enemy.Position.X] = enemy.Symbol
-		}
+		ePos := enemy.Position
+		screen.SetContent(offsetX+ePos.X, offsetY+ePos.Y, enemy.Symbol, nil, enemyStyle)
 	}
 
-	lines := make([]string, 0, snapshot.Arena.Height+2)
-	border := "+" + strings.Repeat("-", snapshot.Arena.Width) + "+"
-	lines = append(lines, border)
-	for _, row := range grid {
-		lines = append(lines, "|"+string(row)+"|")
-	}
-	lines = append(lines, border)
+	// Desenhar a HUD abaixo da arena
+	hudY := offsetY + snapshot.Arena.Height + 1
+	drawString(screen, offsetX, hudY, fmt.Sprintf("HP: %d  Tick: %d", snapshot.HUD.PlayerLife, snapshot.HUD.Tick), defStyle)
+	drawString(screen, offsetX, hudY+1, fmt.Sprintf("Mensagem: %s", snapshot.HUD.Message), tcell.StyleDefault.Foreground(tcell.ColorYellow))
+	drawString(screen, offsetX, hudY+3, "Comandos: Setas (mover), Espaço (atacar), Esc (sair)", borderStyle)
 
-	return strings.Join(lines, "\n")
+	screen.Show() // Atualiza a tela de fato
 }
 
-func isInsideArena(arena Arena, position Position) bool {
-	return position.X >= 0 &&
-		position.X < arena.Width &&
-		position.Y >= 0 &&
-		position.Y < arena.Height
+// Função auxiliar para imprimir strings longas no tcell
+func drawString(screen tcell.Screen, x, y int, text string, style tcell.Style) {
+	for i, r := range text {
+		screen.SetContent(x+i, y, r, nil, style)
+	}
 }

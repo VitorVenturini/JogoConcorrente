@@ -1,28 +1,60 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"os"
-	"strings"
 	"sync"
+
+	"github.com/gdamore/tcell/v2"
 )
 
-func RunInputReader(ctx context.Context, wg *sync.WaitGroup, inputCh chan<- PlayerCommand) {
+func RunInputReader(ctx context.Context, wg *sync.WaitGroup, inputCh chan<- PlayerCommand, screen tcell.Screen) {
 	defer wg.Done()
 
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
+	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
 		}
 
-		raw := strings.TrimSpace(strings.ToLower(scanner.Text()))
-		cmd, ok := parseCommand(raw)
-		if !ok {
-			cmd = PlayerCommand{Type: ""}
+		// screen.PollEvent() aguarda uma tecla ser pressionada instantaneamente
+		ev := screen.PollEvent()
+		if ev == nil {
+			return // Ocorre durante o shutdown quando a tela é finalizada
+		}
+
+		var cmd PlayerCommand
+		valid := false
+
+		switch ev := ev.(type) {
+		case *tcell.EventKey:
+			switch ev.Key() {
+			case tcell.KeyUp:
+				cmd = PlayerCommand{Type: CommandMoveUp}
+				valid = true
+			case tcell.KeyDown:
+				cmd = PlayerCommand{Type: CommandMoveDown}
+				valid = true
+			case tcell.KeyLeft:
+				cmd = PlayerCommand{Type: CommandMoveLeft}
+				valid = true
+			case tcell.KeyRight:
+				cmd = PlayerCommand{Type: CommandMoveRight}
+				valid = true
+			case tcell.KeyEscape: // Botão Esc para sair
+				cmd = PlayerCommand{Type: CommandQuit}
+				valid = true
+			case tcell.KeyRune:
+				// Tecla de Espaço para atacar
+				if ev.Rune() == ' ' {
+					cmd = PlayerCommand{Type: CommandAttack}
+					valid = true
+				}
+			}
+		}
+
+		if !valid {
+			continue
 		}
 
 		select {
@@ -34,24 +66,5 @@ func RunInputReader(ctx context.Context, wg *sync.WaitGroup, inputCh chan<- Play
 		if cmd.Type == CommandQuit {
 			return
 		}
-	}
-}
-
-func parseCommand(raw string) (PlayerCommand, bool) {
-	switch raw {
-	case string(CommandMoveUp):
-		return PlayerCommand{Type: CommandMoveUp}, true
-	case string(CommandMoveDown):
-		return PlayerCommand{Type: CommandMoveDown}, true
-	case string(CommandMoveLeft):
-		return PlayerCommand{Type: CommandMoveLeft}, true
-	case string(CommandMoveRight):
-		return PlayerCommand{Type: CommandMoveRight}, true
-	case string(CommandAttack):
-		return PlayerCommand{Type: CommandAttack}, true
-	case string(CommandQuit):
-		return PlayerCommand{Type: CommandQuit}, true
-	default:
-		return PlayerCommand{}, false
 	}
 }
