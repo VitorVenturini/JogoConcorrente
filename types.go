@@ -87,40 +87,30 @@ type GameSnapshot struct {
 func NewInitialGameState() GameState {
 	player := Player{
 		Name:     "Player",
-		Position: Position{X: 5, Y: 5},
+		Position: Position{X: 15, Y: 15},
 		Health:   10,
-		Symbol:   '@',
+		Symbol:   '🙂',
 	}
 
 	enemies := []Enemy{
-		{
-			ID:       "enemy-a",
-			Name:     "Enemy A",
-			Position: Position{X: 1, Y: 1},
-			Health:   3,
-			Symbol:   'A',
-			Behavior: "chase",
-		},
-		{
-			ID:       "enemy-b",
-			Name:     "Enemy B",
-			Position: Position{X: 8, Y: 8},
-			Health:   3,
-			Symbol:   'B',
-			Behavior: "patrol",
-		},
+		{ID: "enemy-a", Name: "Enemy A", Position: Position{X: 2, Y: 2}, Health: 3, Symbol: '👾', Behavior: "chase"},
+		{ID: "enemy-b", Name: "Enemy B", Position: Position{X: 22, Y: 2}, Health: 3, Symbol: '👹', Behavior: "patrol"},
+		{ID: "enemy-c", Name: "Enemy C", Position: Position{X: 2, Y: 22}, Health: 3, Symbol: '👻', Behavior: "chase"},
+		{ID: "enemy-d", Name: "Enemy D", Position: Position{X: 22, Y: 22}, Health: 3, Symbol: '🤖', Behavior: "patrol"},
+		{ID: "enemy-e", Name: "Enemy E", Position: Position{X: 12, Y: 2}, Health: 3, Symbol: '🐍', Behavior: "chase"},
+		{ID: "enemy-f", Name: "Enemy F", Position: Position{X: 12, Y: 22}, Health: 3, Symbol: '🦇', Behavior: "patrol"},
 	}
 
 	return GameState{
 		Arena: Arena{
-			Width:  10,
-			Height: 10,
+			Width:  25,
+			Height: 25,
 		},
 		Player:  player,
 		Enemies: enemies,
 		HUD: HUD{
 			Tick:       0,
-			Message:    "Digite up, down, left, right, attack ou quit",
+			Message:    "O jogo comecou!! Sobreviva. Use as Setas do teclado",
 			PlayerLife: player.Health,
 		},
 	}

@@ -30,21 +30,29 @@ func main() {
 	enemyActionCh := make(chan EnemyAction)
 	tickCh := make(chan Tick)
 	renderCh := make(chan GameSnapshot, 1)
-	enemyAStateCh := make(chan GameSnapshot, 1)
-	enemyBStateCh := make(chan GameSnapshot, 1)
+
+	//criacao de canais dinamicamente para quantos inimigos existirem
+	var enemyChannels []chan GameSnapshot
+	for i := 0; i < len(state.Enemies); i++ {
+		enemyChannels = append(enemyChannels, make(chan GameSnapshot, 1))
+	}
 
 	var wg sync.WaitGroup
-	wg.Add(6)
+	// 4 goroutines base + 1 goroutine por inimigo
+	wg.Add(4 + len(state.Enemies))
 
-	// 2. Passamos o "screen" para quem precisa (Renderer e InputReader)
-	go RunGameCoordinator(ctx, &wg, state, inputCh, enemyActionCh, tickCh, renderCh, cancel, enemyAStateCh, enemyBStateCh)
+	go RunGameCoordinator(ctx, &wg, state, inputCh, enemyActionCh, tickCh, renderCh, cancel, enemyChannels)
 	go RunRenderer(ctx, &wg, renderCh, screen)
 	go RunInputReader(ctx, &wg, inputCh, screen)
 	go RunTicker(ctx, &wg, tickCh)
 
-	// Como a movimentação agora é instantânea com o tcell, podemos deixar os inimigos rápidos de novo!
-	go RunEnemy(ctx, &wg, "enemy-a", "chase", 800*time.Millisecond, enemyAStateCh, enemyActionCh)
-	go RunEnemy(ctx, &wg, "enemy-b", "patrol", 1200*time.Millisecond, enemyBStateCh, enemyActionCh)
+	// Lancando as 6 entidades autonomas com tempos ligeiramente diferentes
+	go RunEnemy(ctx, &wg, "enemy-a", "chase", 800*time.Millisecond, enemyChannels[0], enemyActionCh)
+	go RunEnemy(ctx, &wg, "enemy-b", "patrol", 1200*time.Millisecond, enemyChannels[1], enemyActionCh)
+	go RunEnemy(ctx, &wg, "enemy-c", "chase", 900*time.Millisecond, enemyChannels[2], enemyActionCh)
+	go RunEnemy(ctx, &wg, "enemy-d", "patrol", 1500*time.Millisecond, enemyChannels[3], enemyActionCh)
+	go RunEnemy(ctx, &wg, "enemy-e", "chase", 1100*time.Millisecond, enemyChannels[4], enemyActionCh)
+	go RunEnemy(ctx, &wg, "enemy-f", "patrol", 1400*time.Millisecond, enemyChannels[5], enemyActionCh)
 
 	<-ctx.Done()
 	wg.Wait()

@@ -2,50 +2,45 @@
 
 ## Projeto Proposto
 
-### Nome sugerido
+### Nome Sugerido
+
 **Arena Concorrente**
 
 ### Resumo
-O projeto proposto é um jogo/simulação de terminal em Go no qual o jogador precisa sobreviver em uma arena 2D textual enquanto inimigos autônomos se movimentam e atacam de forma independente. A concorrência faz parte da arquitetura central: cada componente relevante executa em sua própria goroutine e toda a coordenação ocorre por meio de channels.
+
+O projeto proposto e um jogo/simulacao de terminal em Go no qual o jogador precisa sobreviver em uma arena 2D textual de 25x25 enquanto 6 inimigos autonomos se movimentam e atacam de forma independente. A concorrencia faz parte da arquitetura central: cada componente relevante executa em sua propria goroutine e toda a coordenacao ocorre por meio de channels.
 
 Essa proposta foi escolhida porque:
 
-- é simples de apresentar;
-- é fácil de implementar incrementalmente;
+- e simples de apresentar;
+- e facil de implementar incrementalmente;
 - atende com clareza todos os requisitos da disciplina;
 - permite justificar bem o uso de goroutines, channels e `select`.
 
 ---
 
-## Visão Geral da Arquitetura
+## Visao Geral da Arquitetura
 
-### Ideia central
-A arquitetura será **centralizada em um coordenador do jogo**. Em vez de várias goroutines alterarem o estado compartilhado diretamente, cada goroutine envia eventos para uma goroutine principal de coordenação. Isso reduz risco de `data race`, facilita o shutdown e torna a lógica mais fácil de explicar na apresentação.
+### Ideia Central
 
-### Goroutines principais
+A arquitetura e **centralizada em um coordenador do jogo**. Em vez de varias goroutines alterarem o estado compartilhado diretamente, cada goroutine envia eventos para uma goroutine principal de coordenacao. Isso reduz risco de `data race`, facilita o shutdown e torna a logica mais facil de explicar na apresentacao.
+
+### Goroutines Principais
 
 1. **Main goroutine**
-   Inicializa channels, cria as demais goroutines, aguarda encerramento e finaliza o programa.
-
+    Inicializa a tela do `tcell`, cria os channels, sobe as demais goroutines, aguarda encerramento via `sync.WaitGroup` e finaliza o programa graciosamente.
 2. **Input goroutine**
-   Lê comandos do jogador no terminal e envia ações pelo channel `inputCh`.
-
+    Le comandos do jogador no terminal em "raw mode" (captura de setas e espaco em tempo real usando a biblioteca `tcell`) e envia acoes pelo channel `inputCh`.
 3. **Game Coordinator goroutine**
-   É o núcleo da aplicação. Recebe eventos de input, de inimigos, de ticks de tempo e de shutdown. Atualiza o estado do jogo e publica snapshots para renderização.
-
+    E o nucleo da aplicacao. Recebe eventos de input, de inimigos, de ticks de tempo e de shutdown. Atualiza o estado do jogo (movimentacao, combate, travamento de tela no game over) e publica snapshots para renderizacao e para as entidades autonomas.
 4. **Renderer goroutine**
-   Recebe snapshots imutáveis do estado do jogo e redesenha a tela do terminal em tempo real.
+    Recebe snapshots imutaveis do estado do jogo e redesenha a tela do terminal instantaneamente usando a tecnica de *double-buffering* do `tcell`, sem causar cintilacao (*flicker*).
+5. **Enemy goroutines (A, B, C, D, E e F)**
+    Sao 6 entidades autonomas com comportamento independente. Cada inimigo executa em sua propria goroutine, possuindo um `time.Ticker` exclusivo (ex: 800ms, 1200ms). Em intervalos regulares, decidem movimento/ataque (patrulha ou perseguicao) e enviam intencao para o coordenador.
+6. **Ticker goroutine**
+    Gera pulsos de tempo continuos para avancar a simulacao, atualizar a HUD e padronizar o ritmo logico do jogo.
 
-5. **Enemy A goroutine**
-   Entidade autônoma com comportamento independente. Em intervalos regulares, decide movimento/ataque e envia intenção para o coordenador.
-
-6. **Enemy B goroutine**
-   Segunda entidade autônoma, com a mesma estrutura, mas comportamento independente.
-
-7. **Ticker goroutine**
-   Gera pulsos de tempo para avançar a simulação, controlar cooldowns e padronizar o ritmo do jogo.
-
-Essa arquitetura já atende o requisito de **pelo menos 4 goroutines com papéis distintos**, e inclui **pelo menos 2 entidades autônomas com goroutines próprias**.
+Essa arquitetura atende e supera o requisito de **pelo menos 4 goroutines com papeis distintos**, e inclui **6 entidades autonomas com goroutines proprias**.
 
 ---
 
@@ -53,291 +48,191 @@ Essa arquitetura já atende o requisito de **pelo menos 4 goroutines com papéis
 
 ```mermaid
 flowchart TD
-    M["main goroutine"]
-    I["input goroutine"]
-    C["game coordinator goroutine"]
-    R["renderer goroutine"]
-    T["ticker goroutine"]
-    E1["enemy A goroutine"]
-    E2["enemy B goroutine"]
+     M["main goroutine"]
+     I["input goroutine (tcell)"]
+     C["game coordinator goroutine"]
+     R["renderer goroutine (tcell)"]
+     T["ticker goroutine"]
+     E1["enemy A goroutine"]
+     E2["enemy B goroutine"]
+     E3["enemy C goroutine"]
+    E4["enemy D goroutine"]
+    E5["enemy E goroutine"]
+    E6["enemy F goroutine"]
 
-    IC["inputCh"]
-    TC["tickCh"]
-    E1C["enemyActionCh"]
-    E2C["enemyActionCh"]
-    RC["renderCh"]
-    DC["done / ctx.Done()"]
-    WC["waitGroup"]
+     IC["inputCh"]
+     TC["tickCh"]
+     EAC["enemyActionCh"]
+     RC["renderCh"]
+     ESC["enemyChannels (slice de channels)"]
+     DC["done / ctx.Done()"]
+     WC["waitGroup"]
 
-    M --> I
-    M --> C
-    M --> R
-    M --> T
-    M --> E1
-    M --> E2
+    M --> I & C & R & T & E1 & E2 & E3 & E4 & E5 & E6
 
-    I --> IC --> C
-    T --> TC --> C
-    E1 --> E1C --> C
-    E2 --> E2C --> C
-    C --> RC --> R
+     I --> IC --> C
+     T --> TC --> C
+    E1 & E2 & E3 & E4 & E5 & E6 --> EAC --> C
+     C --> RC --> R
+    C --> ESC --> E1 & E2 & E3 & E4 & E5 & E6
 
-    M --> DC
-    DC --> I
-    DC --> C
-    DC --> R
-    DC --> T
-    DC --> E1
-    DC --> E2
+     M --> DC
+    DC --> I & C & R & T & E1 & E2 & E3 & E4 & E5 & E6
 
-    I --> WC
-    C --> WC
-    R --> WC
-    T --> WC
-    E1 --> WC
-    E2 --> WC
-    WC --> M
+    I & C & R & T & E1 & E2 & E3 & E4 & E5 & E6 --> WC
+     WC --> M
 ```
 
-### Leitura do diagrama
+### Leitura do Diagrama
 
-- `main` cria todas as goroutines.
-- `input goroutine` envia comandos do jogador para `inputCh`.
-- `ticker goroutine` envia pulsos periódicos para `tickCh`.
-- `enemy A` e `enemy B` enviam intenções de ação para `enemyActionCh`.
-- `game coordinator` processa todos os eventos recebidos e envia snapshots para `renderCh`.
-- `done` ou `context cancellation` sinaliza o encerramento coordenado.
-- `WaitGroup` garante que o processo só termina após todas as goroutines encerrarem.
-
----
-
-## Papel de Cada Goroutine
-
-### 1. Main goroutine
-- cria `context.Context` de cancelamento ou channel `done`;
-- inicializa channels;
-- sobe todas as goroutines;
-- espera condição de término;
-- dispara o shutdown;
-- aguarda todas as goroutines via `sync.WaitGroup`.
-
-### 2. Input goroutine
-- lê comandos digitados pelo usuário;
-- converte texto em comandos de domínio, por exemplo `up`, `down`, `left`, `right`, `attack`, `quit`;
-- envia esses comandos para `inputCh`.
-
-### 3. Game Coordinator goroutine
-- mantém o estado oficial do jogo;
-- processa input do jogador;
-- processa ações autônomas dos inimigos;
-- processa ticks do relógio;
-- detecta colisões, dano, vitória e derrota;
-- gera snapshots para renderização;
-- decide quando iniciar o encerramento do sistema.
-
-### 4. Renderer goroutine
-- recebe snapshots do estado;
-- limpa a tela;
-- desenha arena, jogador, inimigos, HUD e mensagens;
-- não decide regras do jogo;
-- usa apenas estado pronto para exibição.
-
-### 5. Enemy A goroutine
-- executa de forma independente;
-- usa temporização própria;
-- calcula intenção de movimento ou ataque;
-- envia eventos para o coordenador;
-- não altera o estado global diretamente.
-
-### 6. Enemy B goroutine
-- mesma responsabilidade estrutural do Enemy A;
-- comportamento independente, permitindo estratégias diferentes e melhor demonstração de autonomia concorrente.
-
-### 7. Ticker goroutine
-- dispara eventos periódicos para o avanço do tempo lógico do jogo;
-- ajuda a separar “passagem do tempo” da lógica de input e de IA.
+- main cria a tela, canais e todas as goroutines.
+- input goroutine captura as setas/espaco do jogador e envia para inputCh.
+- ticker goroutine envia pulsos periodicos para tickCh.
+- as goroutines dos inimigos enviam intencoes de acao para um canal compartilhado enemyActionCh.
+- game coordinator processa todos os eventos concorrentes em um bloco `select`, e envia snapshots para renderCh e para um slice de enemyChannels.
+- done (via context cancellation) sinaliza o encerramento coordenado.
+- WaitGroup garante que o processo so termina apos todas as goroutines encerrarem.
 
 ---
 
-## Estrutura de Comunicação
+## Estrutura de Comunicacao
 
-### Channels sugeridos
+### Channels Utilizados
 
 ```go
 inputCh       chan PlayerCommand
 enemyActionCh chan EnemyAction
 tickCh        chan Tick
 renderCh      chan GameSnapshot
-doneCh        chan struct{}
+enemyChannels []chan GameSnapshot // Slice para N inimigos
 ```
 
-### Por que essa organização?
+### Por Que Essa Organizacao?
 
-- evita múltiplas goroutines escrevendo no mesmo estado;
-- centraliza as transições de estado em um único lugar;
-- facilita rastrear eventos na apresentação;
-- reduz muito o risco de `data race`;
-- torna o uso de `select` natural e justificável.
-
-### Alternativas consideradas
-
-#### 1. Estado compartilhado com mutex entre várias goroutines
-Foi descartado como arquitetura principal porque:
-
-- aumenta complexidade;
-- dificulta explicar consistência;
-- amplia risco de interleavings problemáticos;
-- enfraquece o papel dos channels no projeto.
-
-#### 2. Cada entidade alterando o mapa diretamente
-Também foi descartado porque:
-
-- dificulta manter regras consistentes;
-- aumenta risco de conflito entre ações simultâneas;
-- torna o shutdown e a renderização mais frágeis.
-
-#### 3. Arquitetura totalmente distribuída sem coordenador central
-Foi considerada, mas não escolhida para este trabalho porque seria mais difícil de apresentar e depurar dentro do prazo.
+- evita multiplas goroutines escrevendo no mesmo estado (mapa/arena) simultaneamente;
+- centraliza as transicoes de estado (regras do jogo) em um unico lugar;
+- facilita rastrear eventos na apresentacao;
+- elimina o risco de data race sem a necessidade de espalhar `sync.Mutex` pelo codigo;
+- torna o uso de `select` natural, poderoso e altamente justificavel.
 
 ---
 
-## Uso de `select`
+## Alternativas Consideradas
 
-O `select` será usado principalmente na **goroutine do Game Coordinator**.
+### 1. Estado Compartilhado com Mutex entre Varias Goroutines
 
-### Exemplo conceitual
+Foi descartado como arquitetura principal porque:
+
+- aumenta a complexidade de raciocinio logico;
+- dificulta explicar consistencia;
+- amplia o risco de interleavings problematicos e deadlocks;
+- enfraquece o papel central dos channels, que sao o grande diferencial do Go.
+
+### 2. Cada Entidade Alterando o Mapa Diretamente
+
+Tambem foi descartado porque:
+
+- dificulta manter regras consistentes de colisao;
+- aumenta risco de conflito entre acoes simultaneas (dois inimigos indo para a mesma casa);
+- torna o shutdown e a renderizacao muito frageis.
+
+---
+
+## Uso de select
+
+O `select` e usado de forma central na goroutine do Game Coordinator.
+
+### Exemplo Conceitual da Implementacao
 
 ```go
 for {
-    select {
-    case cmd := <-inputCh:
-        // processa comando do jogador
-    case action := <-enemyActionCh:
-        // processa ação de inimigo
-    case <-tickCh:
-        // atualiza tempo, cooldowns e lógica periódica
-    case <-ctx.Done():
-        // encerra a goroutine de forma graciosa
-        return
-    }
+     select {
+     case <-ctx.Done():
+          // encerra a goroutine de forma graciosa
+          return
+     case cmd := <-inputCh:
+          // processa comando do jogador ou trava se o jogo acabou
+     case action := <-enemyActionCh:
+          // processa intencao de movimento/ataque dos inimigos
+     case tick := <-tickCh:
+          // atualiza interface e tempo logico
+     }
 }
 ```
 
-### Papel de cada `case`
+### Papel de Cada Case
 
-- `inputCh`: recebe ações do jogador.
-- `enemyActionCh`: recebe ações das entidades autônomas.
-- `tickCh`: faz o avanço periódico do jogo.
-- `ctx.Done()` ou `doneCh`: interrompe a goroutine de forma segura.
+- `ctx.Done()`: prioridade maxima. Interrompe a goroutine de forma segura ao sinal de `cancel()`.
+- `inputCh`: recebe acoes do jogador. Se o estado do jogo for GameOver ou Victory, ele trava movimentacoes e aguarda apenas o comando quit (tecla Esc).
+- `enemyActionCh`: multiplexa as acoes de todos os 6 inimigos autonomos recebidas em um unico canal.
+- `tickCh`: avanca o tempo de jogo sem bloquear o restante.
 
-Esse ponto atende diretamente ao requisito de **uso de `select` para multiplexar operações**.
+Esse ponto atende de forma irretocavel ao requisito de uso de `select` para multiplexar operacoes.
 
 ---
 
-## Análise de Concorrência
+## Analise de Concorrencia
 
-### Onde poderia ocorrer deadlock
+### Onde Poderia Ocorrer Deadlock
 
-#### 1. Envio para channel sem receptor ativo
-Se uma goroutine tentar enviar para um channel não-bufferizado quando o receptor não estiver consumindo, ela pode bloquear indefinidamente.
+1. **Envio para channel sem receptor ativo**
+    Se o Coordenador tentar enviar snapshots para o Renderer ou Inimigos enquanto eles processam algo anterior, a aplicacao poderia travar.
+    Prevencao: uso de buffers nos canais (`make(chan GameSnapshot, 1)`) e de envio com clausula default (`select { case ch <- snap: default: }`), garantindo operacoes non-blocking.
+2. **Encerramento fora de ordem**
+    Se o coordenador parar antes das goroutines produtoras, inimigos ou input continuariam tentando enviar mensagens, causando um vazamento silencioso.
+    Prevencao: todas as goroutines observam ativamente o `ctx.Done()`. Produtores param imediatamente, e a main so finaliza apos o WaitGroup confirmar a morte de todos.
 
-**Prevenção:**
-- manter o `game coordinator` sempre ativo enquanto o jogo roda;
-- usar encerramento coordenado;
-- opcionalmente usar buffers pequenos em channels de eventos.
+### Onde Poderia Ocorrer Goroutine Leak
 
-#### 2. Encerramento fora de ordem
-Se o coordenador parar antes das goroutines produtoras, inimigos ou input podem continuar tentando enviar mensagens.
-
-**Prevenção:**
-- todas as goroutines observam `ctx.Done()` ou `doneCh`;
-- produtores interrompem seus loops antes de continuar enviando;
-- `main` só finaliza após `WaitGroup`.
-
-### Onde poderia ocorrer goroutine leak
-
-#### 1. Input bloqueado para sempre
-Uma goroutine de leitura de terminal pode ficar presa esperando entrada.
-
-**Prevenção:**
-- preferir leitura por linha com comando `quit`;
-- tratar fim de jogo também por cancelamento;
-- limitar a responsabilidade da goroutine para que ela pare ao detectar EOF, erro ou cancelamento.
-
-#### 2. Inimigos com loops infinitos sem condição de saída
-Se o loop da IA não observar o sinal de encerramento, a goroutine continuará viva após o fim do jogo.
-
-**Prevenção:**
-- cada entidade autônoma deve ter `select` com caso de cancelamento;
-- a temporização deve ser interrompida no shutdown.
-
-#### 3. Renderer aguardando snapshot que nunca chega
-Se o renderer depender de novos frames sem observar cancelamento, ele pode ficar bloqueado.
-
-**Prevenção:**
-- renderer também observa `ctx.Done()` ou fechamento ordenado do channel.
+1. **Input bloqueado para sempre**
+    Uma goroutine de leitura tradicional com bufio poderia ficar presa no `os.Stdin`.
+    Prevencao: a migracao para a biblioteca `tcell` permite a verificacao continua (`PollEvent()`) e o shutdown natural da interface de terminal devolve o controle ao console limpo.
+2. **Inimigos com loops infinitos**
+    Se o `time.Ticker` do inimigo nao fosse parado, a goroutine e o timer continuariam vivos.
+    Prevencao: uso estrito de `defer ticker.Stop()` e verificacao constante de cancelamento de contexto dentro do loop de vida do inimigo.
 
 ---
 
 ## Shutdown Gracioso
 
-O encerramento gracioso será implementado com o seguinte fluxo:
+O encerramento gracioso esta implementado com o seguinte fluxo de eventos:
 
-1. O jogo detecta condição de término: comando `quit`, derrota do jogador ou vitória.
-2. A goroutine coordenadora ou a `main` chama `cancel()` do contexto compartilhado.
-3. Todas as goroutines recebem o sinal por `ctx.Done()`.
-4. Cada goroutine encerra seu loop, libera timers se necessário e chama `wg.Done()`.
-5. A `main` faz `wg.Wait()` e só então termina o programa.
-
-### Vantagens dessa abordagem
-
-- evita vazamento de goroutines;
-- evita finalização abrupta;
-- facilita testes;
-- é simples de demonstrar na apresentação.
+1. O jogador aperta a tecla Esc (no meio da partida, na vitoria ou na derrota).
+2. A goroutine de Input captura a tecla e envia um `CommandQuit`.
+3. O Coordenador recebe, altera `ShouldQuit = true` e chama `cancel()` do contexto compartilhado.
+4. O canal `ctx.Done()` e fechado. Todas as 10 goroutines ativas quebram seus lacos `for`.
+5. Recursos como Tickers da IA e do sistema sao limpos.
+6. A tela do `tcell` executa o seu `defer screen.Fini()` para nao bugar o terminal do Windows/Linux.
+7. O `wg.Wait()` destrava e a aplicacao encerra retornando 0.
 
 ---
 
-## Visualização em Tempo Real no Terminal
+## Visualizacao em Tempo Real no Terminal
 
-### Escolha recomendada
-Para este projeto, a melhor escolha é **ANSI escape codes** em vez de uma biblioteca externa.
+### Escolha e Justificativa
 
-### Justificativa
+Conforme permitido nas instrucoes (Requisito 6), adotamos a biblioteca `tcell`. Originalmente planejou-se ANSI escape codes, porem o ANSI tradicional via `fmt.Print` no Windows causava forte cintilacao (*flickering*) e o input bloqueante tornava a jogabilidade impraticavel frente a inimigos assincronos.
 
-- menor dependência externa;
-- implementação suficiente para o escopo do trabalho;
-- mais fácil de explicar;
-- mantém foco na concorrência, que é o objetivo principal da disciplina.
+O `tcell` soluciona isso entregando:
 
-### Estratégia de renderização
+- raw mode input: leitura instantanea de teclado (setas e espaco);
+- double-buffering: atualiza apenas os caracteres do grid de 25x25 que efetivamente mudaram de posicao.
 
-- limpar a tela a cada frame;
-- redesenhar arena e HUD;
-- usar snapshots imutáveis enviados pelo coordenador;
-- permitir que apenas a goroutine de renderização escreva no terminal.
-
-Isso evita conflito de saída entre múltiplas goroutines.
+Isso permite focar a complexidade na arquitetura de concorrencia, deixando o front-end estavel.
 
 ---
 
 ## Como o Projeto Atende aos Requisitos
 
-- **Pelo menos 4 goroutines com papéis distintos:** main, input, coordinator, renderer, ticker, enemy A e enemy B.
-- **Comunicação por channels:** toda a coordenação principal usa channels.
-- **Uso de `select`:** concentrado no `game coordinator` e opcionalmente nas entidades.
-- **Pelo menos 2 entidades autônomas:** enemy A e enemy B.
-- **Shutdown gracioso:** via `context cancellation` e `WaitGroup`.
-- **Visualização em tempo real:** renderer dedicado no terminal com ANSI.
+- Pelo menos 4 goroutines com papeis distintos: atendido com sobras (Main, Input, Coordinator, Renderer, Ticker e multiplos inimigos).
+- Comunicacao por channels: toda a coordenacao (mudanca de estado) usa channels estritamente, abolindo mutexes no dominio.
+- Uso de `select`: amplamente explorado no Game Coordinator, Input e Enemies para lidar com a simultaneidade.
+- Pelo menos 2 entidades autonomas: atendido (temos 6 inimigos com logicas e ritmos totalmente autonomos).
+- Shutdown gracioso: fluxo blindado com `context` e `WaitGroup`.
+- Visualizacao em tempo real: implementado elegantemente via `tcell`.
 
 ---
 
-## Conclusão
+## Conclusao
 
-A arquitetura proposta equilibra três objetivos importantes para este trabalho:
-
-- facilidade de implementação;
-- clareza de apresentação;
-- uso correto e justificável de concorrência em Go.
-
-O ponto mais forte do desenho é a separação entre **produção de eventos concorrentes** e **atualização centralizada de estado**, o que facilita tanto a robustez do sistema quanto a explicação acadêmica das decisões de projeto.
+A arquitetura final nao apenas atende aos requisitos academicos da disciplina de FPPD, mas demonstra um caso pratico do proverbio classico do Go: "Nao se comunique compartilhando memoria; compartilhe memoria se comunicando". A dissociacao entre produtores de eventos e o nucleo logico central garantiu um codigo imune a condicoes de corrida, facilmente escalavel (como demonstrado ao ampliar de 2 para 6 inimigos) e simples de apresentar em banca.
