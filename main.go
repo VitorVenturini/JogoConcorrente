@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -10,6 +11,19 @@ import (
 )
 
 func main() {
+	logFile, err := os.OpenFile("debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		log.Printf("Nao foi possivel abrir debug.log: %v", err)
+	} else {
+		log.SetOutput(logFile)
+		log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
+		defer func() {
+			log.Println("Encerrando jogo")
+			_ = logFile.Close()
+		}()
+	}
+	log.Println("Iniciando jogo")
+
 	// 1. Inicialização do tcell
 	screen, err := tcell.NewScreen()
 	if err != nil {
@@ -47,12 +61,12 @@ func main() {
 	go RunTicker(ctx, &wg, tickCh)
 
 	// Lancando as 6 entidades autonomas com tempos ligeiramente diferentes
-	go RunEnemy(ctx, &wg, "enemy-a", "chase", 800*time.Millisecond, enemyChannels[0], enemyActionCh)
-	go RunEnemy(ctx, &wg, "enemy-b", "patrol", 1200*time.Millisecond, enemyChannels[1], enemyActionCh)
-	go RunEnemy(ctx, &wg, "enemy-c", "chase", 900*time.Millisecond, enemyChannels[2], enemyActionCh)
-	go RunEnemy(ctx, &wg, "enemy-d", "patrol", 1500*time.Millisecond, enemyChannels[3], enemyActionCh)
-	go RunEnemy(ctx, &wg, "enemy-e", "chase", 1100*time.Millisecond, enemyChannels[4], enemyActionCh)
-	go RunEnemy(ctx, &wg, "enemy-f", "patrol", 1400*time.Millisecond, enemyChannels[5], enemyActionCh)
+	go RunEnemy(ctx, &wg, "enemy-a", "chase", 400*time.Millisecond, enemyChannels[0], enemyActionCh)
+	go RunEnemy(ctx, &wg, "enemy-b", "chase", 600*time.Millisecond, enemyChannels[1], enemyActionCh)
+	go RunEnemy(ctx, &wg, "enemy-c", "chase", 450*time.Millisecond, enemyChannels[2], enemyActionCh)
+	go RunEnemy(ctx, &wg, "enemy-d", "chase", 700*time.Millisecond, enemyChannels[3], enemyActionCh)
+	go RunEnemy(ctx, &wg, "enemy-e", "chase", 550*time.Millisecond, enemyChannels[4], enemyActionCh)
+	go RunEnemy(ctx, &wg, "enemy-f", "chase", 650*time.Millisecond, enemyChannels[5], enemyActionCh)
 
 	<-ctx.Done()
 	wg.Wait()

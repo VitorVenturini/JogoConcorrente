@@ -9,6 +9,11 @@ A aplicacao consiste em um jogo interativo de terminal projetado inteiramente so
 - **Arena Expansiva**: Grid de combate dimensionado em 25x25.
 - **Alta Concorrencia**: 10 goroutines rodando simultaneamente sem `sync.Mutex`.
 - **I.A. Independente**: 6 inimigos autonomos processados de forma assincrona com base em tempo (`Ticker`) individual, garantindo total independencia das acoes do jogador.
+- **I.A. com Caminho**: Inimigos usam busca em largura (BFS) para contornar obstaculos e perseguir o jogador.
+- **Obstaculos**: Paredes aleatorias no grid, bloqueando movimento do jogador e dos inimigos.
+- **Spawn Seguro**: Jogador e inimigos nunca nascem sobre obstaculos.
+- **Ataque de Alvo Unico**: Cada ataque afeta apenas um inimigo adjacente por vez.
+- **Velocidade Ajustada**: Inimigos com intervalos menores para aumentar a pressao do jogo.
 - **Performance Grafica**: Renderizacao implementada com a biblioteca `tcell` para garantir leitura e plotagem em "Raw Mode", mitigando travamentos e o classico *flickering* (cintilacao) de terminais comuns.
 - **Shutdown Limpo**: Todo o ciclo de vida das goroutines e dos recursos de terminal sao fechados graciosamente atraves do `context.WithCancel` e sincronia do `sync.WaitGroup`.
 
@@ -36,11 +41,21 @@ O projeto foi construido do zero sob as premissas de boas praticas do Go, canali
 go run -race .
 ```
 
+## Diagnostico de Travamentos e Panics
+
+Go nao possui try/catch. Para diagnosticar travamentos e panics, o jogo usa `defer` + `recover` nas goroutines e grava logs em arquivo.
+
+Sempre que o jogo rodar, um arquivo `debug.log` sera criado/atualizado na pasta do projeto. Caso ocorra um travamento, feche o jogo e verifique as ultimas linhas desse arquivo para identificar o componente e a causa.
+
 ## Controles do Jogo
 
-- ⬅️ ⬆️ ⬇️ ➡️ **Setas Direcionais**: Movem o jogador (@) livremente pelo grid.
-- ⎵ **Barra de Espaco**: Executa um ataque fisico direto (atinge simultaneamente todos os inimigos localizados nas casas em cruz adjacentes).
+- ⬅️ ⬆️ ⬇️ ➡️ **Setas Direcionais**: Movem o jogador (🙂) livremente pelo grid.
+- ⎵ **Barra de Espaco**: Executa um ataque fisico direto (atinge apenas um inimigo adjacente por vez).
 - ⎋ **Tecla Esc**: Aciona a CancelFunc global, enviando sinal de shutdown gracioso e fechando o jogo a qualquer momento (inclusive na tela de Game Over/Vitoria).
+
+## Notas de Renderizacao
+
+Os personagens usam emojis. Para evitar sobreposicao visual com os obstaculos, a arena e renderizada com largura dupla por celula, mantendo cada emoji dentro da sua casa.
 
 ## Destaques Academicos da Entrega
 

@@ -1,0 +1,25 @@
+2026/05/13 16:44:02.979011 main.go:25: Iniciando jogo
+2026/05/13 16:44:15.001271 main.go:21: Encerrando jogo
+2026/05/13 16:44:18.019234 main.go:25: Iniciando jogo
+2026/05/13 16:44:30.852202 main.go:21: Encerrando jogo
+2026/05/13 16:44:37.931054 main.go:25: Iniciando jogo
+2026/05/13 16:44:58.084406 main.go:21: Encerrando jogo
+2026/05/13 16:45:01.007354 main.go:25: Iniciando jogo
+2026/05/13 16:48:41.990016 main.go:21: Encerrando jogo
+2026/05/13 16:48:44.125872 main.go:25: Iniciando jogo
+2026/05/13 16:51:24.861456 main.go:25: Iniciando jogo
+2026/05/13 16:51:46.233509 main.go:21: Encerrando jogo
+2026/05/13 16:51:47.747480 main.go:25: Iniciando jogo
+2026/05/13 16:52:11.002215 main.go:21: Encerrando jogo
+2026/05/13 16:54:59.977387 main.go:25: Iniciando jogo
+2026/05/13 16:55:18.675799 main.go:21: Encerrando jogo
+2026/05/13 16:55:20.150302 main.go:25: Iniciando jogo
+2026/05/13 16:55:51.659814 main.go:21: Encerrando jogo
+2026/05/13 16:55:53.348184 main.go:25: Iniciando jogo
+2026/05/13 16:56:07.482415 main.go:21: Encerrando jogo
+2026/05/13 16:59:29.536662 main.go:25: Iniciando jogo
+2026/05/13 16:59:44.479535 main.go:21: Encerrando jogo
+2026/05/13 16:59:45.724221 main.go:25: Iniciando jogo
+2026/05/13 16:59:56.937136 coordinator.go:272: enemy enemy-a blocked by obstacle at {0 10}
+2026/05/13 16:59:58.936851 coordinator.go:272: enemy enemy-a blocked by obstacle at {0 10}
+2026/05/13 17:00:04.936955 coordinator.go:272: enemy enemy-b blocked by obstacle at {0 10}

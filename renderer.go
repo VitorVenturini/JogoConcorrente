@@ -10,6 +10,7 @@ import (
 
 func RunRenderer(ctx context.Context, wg *sync.WaitGroup, renderCh <-chan GameSnapshot, screen tcell.Screen) {
 	defer wg.Done()
+	defer logPanic("renderer")
 
 	for {
 		select {
@@ -29,6 +30,8 @@ func drawSnapshot(snapshot GameSnapshot, screen tcell.Screen) {
 	playerStyle := tcell.StyleDefault.Foreground(tcell.ColorGreen).Bold(true)
 	enemyStyle := tcell.StyleDefault.Foreground(tcell.ColorRed).Bold(true)
 	borderStyle := tcell.StyleDefault.Foreground(tcell.ColorGray)
+	obstacleStyle := tcell.StyleDefault.Foreground(tcell.ColorGray)
+	cellWidth := 2
 
 	offsetX := 2
 	offsetY := 2
@@ -36,28 +39,37 @@ func drawSnapshot(snapshot GameSnapshot, screen tcell.Screen) {
 	// Desenhar o cenário
 	for y := 0; y < snapshot.Arena.Height; y++ {
 		for x := 0; x < snapshot.Arena.Width; x++ {
-			screen.SetContent(offsetX+x, offsetY+y, '.', nil, defStyle)
+			cx := offsetX + x*cellWidth
+			screen.SetContent(cx, offsetY+y, '.', nil, defStyle)
+			screen.SetContent(cx+1, offsetY+y, ' ', nil, defStyle)
 		}
 	}
 
+	// Desenhar obstaculos
+	for _, pos := range snapshot.Obstacles {
+		cx := offsetX + pos.X*cellWidth
+		screen.SetContent(cx, offsetY+pos.Y, '#', nil, obstacleStyle)
+		screen.SetContent(cx+1, offsetY+pos.Y, ' ', nil, obstacleStyle)
+	}
+
 	// Desenhar bordas
-	for x := 0; x < snapshot.Arena.Width; x++ {
+	for x := 0; x < snapshot.Arena.Width*cellWidth; x++ {
 		screen.SetContent(offsetX+x, offsetY-1, '-', nil, borderStyle)
 		screen.SetContent(offsetX+x, offsetY+snapshot.Arena.Height, '-', nil, borderStyle)
 	}
 	for y := 0; y < snapshot.Arena.Height; y++ {
 		screen.SetContent(offsetX-1, offsetY+y, '|', nil, borderStyle)
-		screen.SetContent(offsetX+snapshot.Arena.Width, offsetY+y, '|', nil, borderStyle)
+		screen.SetContent(offsetX+snapshot.Arena.Width*cellWidth, offsetY+y, '|', nil, borderStyle)
 	}
 
 	// Desenhar o jogador
 	pPos := snapshot.Player.Position
-	screen.SetContent(offsetX+pPos.X, offsetY+pPos.Y, snapshot.Player.Symbol, nil, playerStyle)
+	screen.SetContent(offsetX+pPos.X*cellWidth, offsetY+pPos.Y, snapshot.Player.Symbol, nil, playerStyle)
 
 	// Desenhar os inimigos
 	for _, enemy := range snapshot.Enemies {
 		ePos := enemy.Position
-		screen.SetContent(offsetX+ePos.X, offsetY+ePos.Y, enemy.Symbol, nil, enemyStyle)
+		screen.SetContent(offsetX+ePos.X*cellWidth, offsetY+ePos.Y, enemy.Symbol, nil, enemyStyle)
 	}
 
 	// Desenhar a HUD abaixo da arena

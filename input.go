@@ -9,6 +9,7 @@ import (
 
 func RunInputReader(ctx context.Context, wg *sync.WaitGroup, inputCh chan<- PlayerCommand, screen tcell.Screen) {
 	defer wg.Done()
+	defer logPanic("input")
 
 	for {
 		select {

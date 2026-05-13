@@ -119,6 +119,20 @@ enemyChannels []chan GameSnapshot // Slice para N inimigos
 
 ---
 
+## Obstaculos e Colisoes
+
+O mapa inclui obstaculos aleatorios gerados no inicio da partida. Essas paredes sao intransponiveis para o jogador e para os inimigos (bloqueiam movimento em todas as direcoes). Para manter a integridade do jogo, o algoritmo de spawn garante que nem o jogador nem os inimigos nascam dentro de obstaculos.
+
+## Navegacao dos Inimigos
+
+Para evitar que os inimigos fiquem presos batendo em paredes, a persecucao usa uma busca em largura (BFS) calculada a partir do snapshot recebido. Cada inimigo decide a acao localmente com dados imutaveis e comunica apenas a intencao via channel.
+
+## Renderizacao com Emojis
+
+Os sprites sao emojis (largura dupla). A renderizacao usa celulas com largura dupla para garantir que obstaculos e personagens nao se sobreponham visualmente no grid.
+
+---
+
 ## Alternativas Consideradas
 
 ### 1. Estado Compartilhado com Mutex entre Varias Goroutines

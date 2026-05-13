@@ -1,5 +1,10 @@
 package main
 
+import (
+	"math/rand"
+	"time"
+)
+
 type CommandType string
 
 const (
@@ -69,6 +74,7 @@ type GameState struct {
 	Arena      Arena
 	Player     Player
 	Enemies    []Enemy
+	Obstacles  []Position
 	HUD        HUD
 	GameOver   bool
 	Victory    bool
@@ -76,15 +82,21 @@ type GameState struct {
 }
 
 type GameSnapshot struct {
-	Arena    Arena
-	Player   Player
-	Enemies  []Enemy
-	HUD      HUD
-	GameOver bool
-	Victory  bool
+	Arena     Arena
+	Player    Player
+	Enemies   []Enemy
+	Obstacles []Position
+	HUD       HUD
+	GameOver  bool
+	Victory   bool
 }
 
 func NewInitialGameState() GameState {
+	arena := Arena{
+		Width:  25,
+		Height: 25,
+	}
+
 	player := Player{
 		Name:     "Player",
 		Position: Position{X: 15, Y: 15},
@@ -93,21 +105,23 @@ func NewInitialGameState() GameState {
 	}
 
 	enemies := []Enemy{
-		{ID: "enemy-a", Name: "Enemy A", Position: Position{X: 2, Y: 2}, Health: 3, Symbol: '👾', Behavior: "chase"},
-		{ID: "enemy-b", Name: "Enemy B", Position: Position{X: 22, Y: 2}, Health: 3, Symbol: '👹', Behavior: "patrol"},
-		{ID: "enemy-c", Name: "Enemy C", Position: Position{X: 2, Y: 22}, Health: 3, Symbol: '👻', Behavior: "chase"},
-		{ID: "enemy-d", Name: "Enemy D", Position: Position{X: 22, Y: 22}, Health: 3, Symbol: '🤖', Behavior: "patrol"},
-		{ID: "enemy-e", Name: "Enemy E", Position: Position{X: 12, Y: 2}, Health: 3, Symbol: '🐍', Behavior: "chase"},
-		{ID: "enemy-f", Name: "Enemy F", Position: Position{X: 12, Y: 22}, Health: 3, Symbol: '🦇', Behavior: "patrol"},
+		{ID: "enemy-a", Name: "Enemy A", Position: Position{}, Health: 3, Symbol: '👾', Behavior: "chase"},
+		{ID: "enemy-b", Name: "Enemy B", Position: Position{}, Health: 3, Symbol: '👹', Behavior: "chase"},
+		{ID: "enemy-c", Name: "Enemy C", Position: Position{}, Health: 3, Symbol: '👻', Behavior: "chase"},
+		{ID: "enemy-d", Name: "Enemy D", Position: Position{}, Health: 3, Symbol: '🤖', Behavior: "chase"},
+		{ID: "enemy-e", Name: "Enemy E", Position: Position{}, Health: 3, Symbol: '🐍', Behavior: "chase"},
+		{ID: "enemy-f", Name: "Enemy F", Position: Position{}, Health: 3, Symbol: '🦇', Behavior: "chase"},
 	}
 
+	obstacles := randomObstacles(arena, player.Position, len(enemies))
+
+	randomizeEnemyPositions(enemies, arena, player.Position, obstacles)
+
 	return GameState{
-		Arena: Arena{
-			Width:  25,
-			Height: 25,
-		},
-		Player:  player,
-		Enemies: enemies,
+		Arena:     arena,
+		Player:    player,
+		Enemies:   enemies,
+		Obstacles: obstacles,
 		HUD: HUD{
 			Tick:       0,
 			Message:    "O jogo comecou!! Sobreviva. Use as Setas do teclado",
@@ -116,16 +130,78 @@ func NewInitialGameState() GameState {
 	}
 }
 
+func randomizeEnemyPositions(enemies []Enemy, arena Arena, playerPos Position, obstacles []Position) {
+	maxCells := arena.Width * arena.Height
+	if len(enemies)+1 > maxCells {
+		return
+	}
+
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	used := map[Position]bool{
+		playerPos: true,
+	}
+	for _, pos := range obstacles {
+		used[pos] = true
+	}
+
+	for i := range enemies {
+		for {
+			pos := Position{X: rng.Intn(arena.Width), Y: rng.Intn(arena.Height)}
+			if !used[pos] {
+				used[pos] = true
+				enemies[i].Position = pos
+				break
+			}
+		}
+	}
+}
+
+func randomObstacles(arena Arena, playerPos Position, enemyCount int) []Position {
+	area := arena.Width * arena.Height
+	maxCount := area - (1 + enemyCount)
+	if maxCount <= 0 {
+		return nil
+	}
+
+	count := area / 20
+	if count < 20 {
+		count = 20
+	}
+	if count > maxCount {
+		count = maxCount
+	}
+
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	used := map[Position]bool{
+		playerPos: true,
+	}
+	obstacles := make([]Position, 0, count)
+
+	for len(obstacles) < count {
+		pos := Position{X: rng.Intn(arena.Width), Y: rng.Intn(arena.Height)}
+		if used[pos] {
+			continue
+		}
+		used[pos] = true
+		obstacles = append(obstacles, pos)
+	}
+
+	return obstacles
+}
+
 func (s GameState) Snapshot() GameSnapshot {
 	enemiesCopy := make([]Enemy, len(s.Enemies))
 	copy(enemiesCopy, s.Enemies)
+	obstaclesCopy := make([]Position, len(s.Obstacles))
+	copy(obstaclesCopy, s.Obstacles)
 
 	return GameSnapshot{
-		Arena:    s.Arena,
-		Player:   s.Player,
-		Enemies:  enemiesCopy,
-		HUD:      s.HUD,
-		GameOver: s.GameOver,
-		Victory:  s.Victory,
+		Arena:     s.Arena,
+		Player:    s.Player,
+		Enemies:   enemiesCopy,
+		Obstacles: obstaclesCopy,
+		HUD:       s.HUD,
+		GameOver:  s.GameOver,
+		Victory:   s.Victory,
 	}
 }

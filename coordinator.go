@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"strconv"
 	"sync"
 )
@@ -18,6 +19,7 @@ func RunGameCoordinator(
 	enemyChannels []chan GameSnapshot,
 ) {
 	defer wg.Done()
+	defer logPanic("coordinator")
 
 	state := initialState
 	updateAllSnapshots(&state, renderCh, enemyChannels)
@@ -67,9 +69,18 @@ func updateAllSnapshots(state *GameState, r chan GameSnapshot, enemyChannels []c
 func sendSnapshot(ch chan GameSnapshot, snapshot GameSnapshot) {
 	select {
 	case ch <- snapshot:
+		return
 	default:
-		<-ch
-		ch <- snapshot
+	}
+
+	select {
+	case <-ch:
+	default:
+	}
+
+	select {
+	case ch <- snapshot:
+	default:
 	}
 }
 
@@ -111,6 +122,14 @@ func movePlayer(state *GameState, deltaX, deltaY int) {
 		state.HUD.Message = "Movimento bloqueado pela borda da arena"
 		return
 	}
+	if isObstacleAt(state, next) {
+		state.HUD.Message = "Movimento bloqueado por obstaculo"
+		return
+	}
+	if isEnemyAt(state, next) {
+		state.HUD.Message = "Movimento bloqueado por inimigo"
+		return
+	}
 
 	state.Player.Position = next
 }
@@ -118,33 +137,28 @@ func movePlayer(state *GameState, deltaX, deltaY int) {
 func attackEnemies(state *GameState) {
 	px := state.Player.Position.X
 	py := state.Player.Position.Y
-	adjacent := []Position{
-		{X: px, Y: py - 1},
-		{X: px, Y: py + 1},
-		{X: px - 1, Y: py},
-		{X: px + 1, Y: py},
+
+	targetIndex := -1
+	for i, e := range state.Enemies {
+		dx := absInt(e.Position.X - px)
+		dy := absInt(e.Position.Y - py)
+
+		// Considera qualquer casa adjacente (8 direcoes), exceto a propria casa do jogador.
+		if dx <= 1 && dy <= 1 && !(dx == 0 && dy == 0) {
+			targetIndex = i
+			break
+		}
 	}
 
-	hit := false
-	var remaining []Enemy
-	for _, e := range state.Enemies {
-		damaged := false
-		for _, pos := range adjacent {
-			if e.Position == pos {
-				e.Health--
-				damaged = true
-				hit = true
-				break
-			}
-		}
-		if !damaged || e.Health > 0 {
-			remaining = append(remaining, e)
+	if targetIndex >= 0 {
+		state.Enemies[targetIndex].Health--
+		if state.Enemies[targetIndex].Health <= 0 {
+			state.Enemies = append(state.Enemies[:targetIndex], state.Enemies[targetIndex+1:]...)
 		}
 	}
-	state.Enemies = remaining
 
 	switch {
-	case !hit:
+	case targetIndex < 0:
 		state.HUD.Message = "Ataque no vazio"
 	case len(state.Enemies) == 0:
 		state.Victory = true
@@ -152,6 +166,67 @@ func attackEnemies(state *GameState) {
 	default:
 		state.HUD.Message = "Ataque executado!"
 	}
+}
+
+func absInt(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
+func isEnemyAt(state *GameState, pos Position) bool {
+	for _, e := range state.Enemies {
+		if e.Position == pos {
+			return true
+		}
+	}
+	return false
+}
+
+func isObstacleAt(state *GameState, pos Position) bool {
+	for _, o := range state.Obstacles {
+		if o == pos {
+			return true
+		}
+	}
+	return false
+}
+
+func isEnemyAtExcept(state *GameState, pos Position, enemyID string) bool {
+	for _, e := range state.Enemies {
+		if e.ID != enemyID && e.Position == pos {
+			return true
+		}
+	}
+	return false
+}
+
+func findFreeAdjacentCell(state *GameState, origin Position, enemyID string) (Position, bool) {
+	candidates := []Position{
+		{X: origin.X, Y: origin.Y - 1},
+		{X: origin.X, Y: origin.Y + 1},
+		{X: origin.X - 1, Y: origin.Y},
+		{X: origin.X + 1, Y: origin.Y},
+	}
+
+	for _, pos := range candidates {
+		if pos.X < 0 || pos.X >= state.Arena.Width || pos.Y < 0 || pos.Y >= state.Arena.Height {
+			continue
+		}
+		if isObstacleAt(state, pos) {
+			continue
+		}
+		if pos == state.Player.Position {
+			continue
+		}
+		if isEnemyAtExcept(state, pos, enemyID) {
+			continue
+		}
+		return pos, true
+	}
+
+	return Position{}, false
 }
 
 func handleEnemyAction(state *GameState, action EnemyAction) {
@@ -173,13 +248,31 @@ func handleEnemyAction(state *GameState, action EnemyAction) {
 		return
 	}
 
-	next := action.Target
-	if next.X < 0 || next.X >= state.Arena.Width || next.Y < 0 || next.Y >= state.Arena.Height {
+	current := state.Enemies[idx].Position
+	if isEnemyAtExcept(state, current, action.EnemyID) {
+		if pos, ok := findFreeAdjacentCell(state, current, action.EnemyID); ok {
+			state.Enemies[idx].Position = pos
+			state.HUD.Message = action.EnemyID + " se afastou"
+		} else {
+			log.Printf("enemy %s overlap at %v; no free adjacent", action.EnemyID, current)
+		}
 		return
 	}
 
-	state.Enemies[idx].Position = next
-
+	next := action.Target
+	if next.X < 0 || next.X >= state.Arena.Width || next.Y < 0 || next.Y >= state.Arena.Height {
+		log.Printf("enemy %s target out of bounds: %v", action.EnemyID, next)
+		return
+	}
+	if isObstacleAt(state, next) {
+		if pos, ok := findFreeAdjacentCell(state, current, action.EnemyID); ok {
+			state.Enemies[idx].Position = pos
+			state.HUD.Message = action.EnemyID + " desviou"
+		} else {
+			log.Printf("enemy %s blocked by obstacle at %v", action.EnemyID, next)
+		}
+		return
+	}
 	if next == state.Player.Position {
 		state.Player.Health--
 		state.HUD.PlayerLife = state.Player.Health
@@ -188,9 +281,24 @@ func handleEnemyAction(state *GameState, action EnemyAction) {
 			state.GameOver = true
 			state.HUD.Message = "Game Over! Voce foi derrotado."
 		}
-	} else {
-		state.HUD.Message = action.EnemyID + " moveu"
+		return
 	}
+	if next == current {
+		return
+	}
+	if isEnemyAtExcept(state, next, action.EnemyID) {
+		if pos, ok := findFreeAdjacentCell(state, current, action.EnemyID); ok {
+			state.Enemies[idx].Position = pos
+			state.HUD.Message = action.EnemyID + " desviou"
+		} else {
+			log.Printf("enemy %s blocked at %v; target occupied", action.EnemyID, next)
+		}
+		return //se ja tem alguem naquela casa, ele aborta o movimento(colisao de inimigos)
+	}
+
+	//se a casa estiver livre, atualiza a posicao
+	state.Enemies[idx].Position = next
+	state.HUD.Message = action.EnemyID + " moveu"
 }
 
 func handleTick(state *GameState, tick Tick) {
