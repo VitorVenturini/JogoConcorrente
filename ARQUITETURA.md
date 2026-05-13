@@ -251,4 +251,4 @@ Isso permite focar a complexidade na arquitetura de concorrencia, deixando o fro
 
 ## Conclusao
 
-A arquitetura final nao apenas atende aos requisitos academicos da disciplina de FPPD, mas demonstra um caso pratico do proverbio classico do Go: "Nao se comunique compartilhando memoria; compartilhe memoria se comunicando". A dissociacao entre produtores de eventos e o nucleo logico central garantiu um codigo imune a condicoes de corrida, facilmente escalavel (como demonstrado ao ampliar de 2 para 6 inimigos) e simples de apresentar em banca.
+A arquitetura final nao apenas atende aos requisitos academicos da disciplina de FPPD, mas demonstra um caso pratico do proverbio classico do Go: "Nao se comunique compartilhando memoria; compartilhe memoria se comunicando". A dissociacao entre produtores de eventos e o nucleo logico central garantiu um codigo imune a condicoes de corrida, facilmente escalavel (como demonstrado ao ampliar de 2 para 6 inimigos) e simples de apresentar.
