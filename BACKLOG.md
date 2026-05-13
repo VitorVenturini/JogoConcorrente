@@ -4,6 +4,8 @@
 
 Este backlog dividiu o projeto em etapas pequenas, incrementais e testaveis. A ideia central foi permitir que o grupo implementasse o jogo de forma progressiva, validando a concorrencia, comunicacao por channels, renderizacao e shutdown gracioso em cada fase, ate culminar no estado atual de entrega.
 
+Projeto desenvolvido por Rodrigo e Vitor.
+
 O projeto de referencia deste backlog e o detalhado em `ARQUITETURA.md`: **Arena Concorrente**.
 
 ---

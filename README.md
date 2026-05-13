@@ -1,6 +1,6 @@
 # Arena Concorrente 🛡️
 
-Projeto desenvolvido em linguagem Go para a disciplina de **Fundamentos de Processamento Paralelo e Distribuido (FPPD)**.
+Projeto desenvolvido por Rodrigo e Vitor em linguagem Go para a disciplina de **Fundamentos de Processamento Paralelo e Distribuido (FPPD)**.
 
 A aplicacao consiste em um jogo interativo de terminal projetado inteiramente sob uma arquitetura orientada a goroutines e channels, aplicando de forma pratica a teoria de concorrencia com passagem de mensagens, eliminando o uso de travas na memoria.
 

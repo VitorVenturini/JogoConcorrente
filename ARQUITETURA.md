@@ -10,6 +10,8 @@
 
 O projeto proposto e um jogo/simulacao de terminal em Go no qual o jogador precisa sobreviver em uma arena 2D textual de 25x25 enquanto 6 inimigos autonomos se movimentam e atacam de forma independente. A concorrencia faz parte da arquitetura central: cada componente relevante executa em sua propria goroutine e toda a coordenacao ocorre por meio de channels.
 
+Projeto desenvolvido por Rodrigo e Vitor.
+
 Essa proposta foi escolhida porque:
 
 - e simples de apresentar;
