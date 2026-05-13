@@ -24,6 +24,13 @@ const (
 	EnemyActionWait   EnemyActionType = "wait"
 )
 
+type EffectKind string
+
+const (
+	EffectAttack EffectKind = "attack"
+	EffectHit    EffectKind = "hit"
+)
+
 type Position struct {
 	X int
 	Y int
@@ -64,6 +71,12 @@ type Enemy struct {
 	Behavior string
 }
 
+type Effect struct {
+	Pos   Position
+	Kind  EffectKind
+	Ticks int
+}
+
 type HUD struct {
 	Tick       int
 	Message    string
@@ -75,6 +88,7 @@ type GameState struct {
 	Player     Player
 	Enemies    []Enemy
 	Obstacles  []Position
+	Effects    []Effect
 	HUD        HUD
 	GameOver   bool
 	Victory    bool
@@ -86,6 +100,7 @@ type GameSnapshot struct {
 	Player    Player
 	Enemies   []Enemy
 	Obstacles []Position
+	Effects   []Effect
 	HUD       HUD
 	GameOver  bool
 	Victory   bool
@@ -122,6 +137,7 @@ func NewInitialGameState() GameState {
 		Player:    player,
 		Enemies:   enemies,
 		Obstacles: obstacles,
+		Effects:   nil,
 		HUD: HUD{
 			Tick:       0,
 			Message:    "O jogo comecou!! Sobreviva. Use as Setas do teclado",
@@ -194,12 +210,15 @@ func (s GameState) Snapshot() GameSnapshot {
 	copy(enemiesCopy, s.Enemies)
 	obstaclesCopy := make([]Position, len(s.Obstacles))
 	copy(obstaclesCopy, s.Obstacles)
+	effectsCopy := make([]Effect, len(s.Effects))
+	copy(effectsCopy, s.Effects)
 
 	return GameSnapshot{
 		Arena:     s.Arena,
 		Player:    s.Player,
 		Enemies:   enemiesCopy,
 		Obstacles: obstaclesCopy,
+		Effects:   effectsCopy,
 		HUD:       s.HUD,
 		GameOver:  s.GameOver,
 		Victory:   s.Victory,

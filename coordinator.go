@@ -139,6 +139,7 @@ func attackEnemies(state *GameState) {
 	py := state.Player.Position.Y
 
 	targetIndex := -1
+	targetPos := Position{}
 	for i, e := range state.Enemies {
 		dx := absInt(e.Position.X - px)
 		dy := absInt(e.Position.Y - py)
@@ -146,6 +147,7 @@ func attackEnemies(state *GameState) {
 		// Considera qualquer casa adjacente (8 direcoes), exceto a propria casa do jogador.
 		if dx <= 1 && dy <= 1 && !(dx == 0 && dy == 0) {
 			targetIndex = i
+			targetPos = e.Position
 			break
 		}
 	}
@@ -155,6 +157,9 @@ func attackEnemies(state *GameState) {
 		if state.Enemies[targetIndex].Health <= 0 {
 			state.Enemies = append(state.Enemies[:targetIndex], state.Enemies[targetIndex+1:]...)
 		}
+		addEffect(state, targetPos, EffectAttack, 2)
+	} else {
+		addEffect(state, state.Player.Position, EffectAttack, 1)
 	}
 
 	switch {
@@ -277,6 +282,7 @@ func handleEnemyAction(state *GameState, action EnemyAction) {
 		state.Player.Health--
 		state.HUD.PlayerLife = state.Player.Health
 		state.HUD.Message = action.EnemyID + " atacou o jogador! HP: " + strconv.Itoa(state.Player.Health)
+		addEffect(state, state.Player.Position, EffectHit, 2)
 		if state.Player.Health <= 0 {
 			state.GameOver = true
 			state.HUD.Message = "Game Over! Voce foi derrotado."
@@ -303,4 +309,26 @@ func handleEnemyAction(state *GameState, action EnemyAction) {
 
 func handleTick(state *GameState, tick Tick) {
 	state.HUD.Tick = tick.Number
+	updateEffects(state)
+}
+
+func addEffect(state *GameState, pos Position, kind EffectKind, ticks int) {
+	if ticks <= 0 {
+		return
+	}
+	state.Effects = append(state.Effects, Effect{Pos: pos, Kind: kind, Ticks: ticks})
+}
+
+func updateEffects(state *GameState) {
+	if len(state.Effects) == 0 {
+		return
+	}
+	remaining := state.Effects[:0]
+	for _, e := range state.Effects {
+		e.Ticks--
+		if e.Ticks > 0 {
+			remaining = append(remaining, e)
+		}
+	}
+	state.Effects = remaining
 }

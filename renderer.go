@@ -33,6 +33,26 @@ func drawSnapshot(snapshot GameSnapshot, screen tcell.Screen) {
 	obstacleStyle := tcell.StyleDefault.Foreground(tcell.ColorGray)
 	cellWidth := 2
 
+	effectMap := make(map[Position]EffectKind, len(snapshot.Effects))
+	for _, e := range snapshot.Effects {
+		effectMap[e.Pos] = e.Kind
+	}
+
+	effectStyle := func(pos Position, base tcell.Style) tcell.Style {
+		kind, ok := effectMap[pos]
+		if !ok {
+			return base
+		}
+		switch kind {
+		case EffectAttack:
+			return base.Background(tcell.ColorYellow)
+		case EffectHit:
+			return base.Background(tcell.ColorRed)
+		default:
+			return base
+		}
+	}
+
 	offsetX := 2
 	offsetY := 2
 
@@ -64,12 +84,12 @@ func drawSnapshot(snapshot GameSnapshot, screen tcell.Screen) {
 
 	// Desenhar o jogador
 	pPos := snapshot.Player.Position
-	screen.SetContent(offsetX+pPos.X*cellWidth, offsetY+pPos.Y, snapshot.Player.Symbol, nil, playerStyle)
+	screen.SetContent(offsetX+pPos.X*cellWidth, offsetY+pPos.Y, snapshot.Player.Symbol, nil, effectStyle(pPos, playerStyle))
 
 	// Desenhar os inimigos
 	for _, enemy := range snapshot.Enemies {
 		ePos := enemy.Position
-		screen.SetContent(offsetX+ePos.X*cellWidth, offsetY+ePos.Y, enemy.Symbol, nil, enemyStyle)
+		screen.SetContent(offsetX+ePos.X*cellWidth, offsetY+ePos.Y, enemy.Symbol, nil, effectStyle(ePos, enemyStyle))
 	}
 
 	// Desenhar a HUD abaixo da arena
